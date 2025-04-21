@@ -1,0 +1,2 @@
+python3 ../Hierarchy/encode_hierarchy.py --h_file Test_files/macho_hierarchy.txt --m_file Test_files/macho_meta.txt --out Test_files/macho.parent-child.txt --out_names Test_files/macho_class_names.txt
+python3 ../compute_class_embedding.py --hierarchy Test_files/macho.parent-child.txt --out Test_files/macho.unitsphere.pickle 

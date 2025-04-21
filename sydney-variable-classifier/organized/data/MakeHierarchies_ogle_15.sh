@@ -1,0 +1,2 @@
+python3 ../Hierarchy/encode_hierarchy.py --h_file Test_files/ogle_hierarchy_15.txt --m_file Test_files/ogle_meta_15.txt --out Test_files/ogle.parent-child_15.txt --out_names Test_files/ogle_class_names_15.txt
+python3 ../compute_class_embedding.py --hierarchy Test_files/ogle.parent-child_15.txt --out Test_files/ogle_15.unitsphere.pickle --metric 2 

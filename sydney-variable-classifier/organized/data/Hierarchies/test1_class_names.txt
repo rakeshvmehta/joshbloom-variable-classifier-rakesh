@@ -1,0 +1,7 @@
+0 milo
+1 mouse
+2 reptil
+3 animal
+4 mammal
+5 reptile
+6 dog

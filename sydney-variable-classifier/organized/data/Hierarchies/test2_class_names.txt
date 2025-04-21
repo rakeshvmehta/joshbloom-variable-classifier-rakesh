@@ -1,0 +1,8 @@
+0 bark
+1 leaf
+2 petal
+3 root
+4 trunk
+5 branch
+6 twig
+7 flower

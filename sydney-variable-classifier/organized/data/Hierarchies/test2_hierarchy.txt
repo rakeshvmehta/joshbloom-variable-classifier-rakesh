@@ -1,0 +1,8 @@
+root
+-- trunk
+---- bark
+---- branch
+------ twig
+-------- leaf
+-------- flower
+---------- petal

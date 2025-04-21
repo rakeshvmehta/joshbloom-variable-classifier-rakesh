@@ -1,0 +1,17 @@
+0 RRL_AB
+1 RRL_C
+2 RRL_E
+3 RRL_+_GB
+4 Ceph_Fund
+5 Ceph_1st
+6 LPV_WoodA
+7 LPV_WoodB
+8 LPV_WoodC
+9 LPV_WoodD
+10 EB
+11 Var
+12 pulsating
+13 eclipsing
+14 LPV
+15 Ceph
+16 RRL

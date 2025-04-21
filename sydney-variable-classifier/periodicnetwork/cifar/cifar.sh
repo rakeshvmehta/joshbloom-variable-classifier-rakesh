@@ -1,0 +1,1 @@
+python3 train_cifar.py --network iresnet --cuda --ngpu 1 --levels 6 --ksize 3 --nhid 6 --nhid_max 500 --embedding data/cifar.unitsphere.pickle --classnames data/cifar_class_names.txt --hierarchy data/cifar.parent-child.txt --classification 'hidden' --lr 2e-3

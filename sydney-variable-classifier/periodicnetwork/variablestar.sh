@@ -1,0 +1,1 @@
+python3 train.py --path results/wandb --network iresnet --cudnn_deterministic --min_sample 20 --hidden 16 --L 200 --kernel 7 --depth 5 --max_hidden 32 --filename ogle_data.pkl --ngpu 1 --K 1 --embedding data/ogle.unitsphere.pickle --classnames data/ogle_class_names.txt --hierarchy data/ogle.parent-child.txt --classification 'cosine' --loss "height" --max_epoch 2 --no-log&

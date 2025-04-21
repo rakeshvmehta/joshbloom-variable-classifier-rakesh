@@ -1,0 +1,51 @@
+# sweep.yaml
+program: train.py
+command:
+  - python3
+  - train.py
+  - --path 
+  - results/wandb 
+  - --network 
+  - iresnet 
+  - --cudnn_deterministic 
+  - --min_sample 
+  - 20 
+  - --L 
+  - 200 
+  - --filename 
+  - ogle_data_aug.pkl   
+  - --ngpu 
+  - 1 
+  - --K 
+  - 1 
+  - --embedding 
+  - data/ogle.unitsphere.pickle 
+  - --classnames 
+  - data/ogle_class_names.txt 
+  - --hierarchy 
+  - data/ogle.parent-child.txt 
+  - --classification 
+  - 'cosine'    
+  - --max_epoch 
+  - 10
+  - --optimize
+method: grid
+metric:
+ name: val_loss
+ goal: minimize
+parameters:
+ hidden: 
+   values: [16, 32]
+ max_hidden: 
+   values: [32, 64, 128]
+ depth: 
+   values: [5, 6, 7]
+ kernel: 
+   values: [3, 5, 7]
+ hidden_classifier: 
+   values: [32, 64, 128]
+early_terminate:
+   type: hyperband
+   s: 2
+   eta: 3
+   max_iter: 27

@@ -1,0 +1,17 @@
+Var
+-- pulsating
+---- RRL
+------ RRL_AB
+------ RRL_C
+------ RRL_E
+------ RRL_+_GB
+---- Ceph
+------ Ceph_Fund
+------ Ceph_1st
+---- LPV
+------ LPV_WoodA
+------ LPV_WoodB
+------ LPV_WoodC
+------ LPV_WoodD
+-- eclipsing
+---- EB

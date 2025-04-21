@@ -1,0 +1,13 @@
+variable
+-- eclipsing
+---- EB
+-- pulsating
+---- RRL 
+------ RRLAB
+------ RRLC
+------ RRLE
+------ RRL+GB
+---- Ceph
+------ CephFund
+------ Ceph1st
+---- LPV

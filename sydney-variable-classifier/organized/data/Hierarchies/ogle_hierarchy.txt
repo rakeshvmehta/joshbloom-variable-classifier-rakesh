@@ -1,0 +1,31 @@
+VAR
+-- pulsating
+---- RRLyr
+------ RRLyr_RRab
+------ RRLyr_RRc
+------ RRLyr_RRd
+------ RRLyr_RRe
+---- Cep
+------ aCep
+-------- aCep_F
+------ mCep
+-------- Cep_12
+-------- Cep_F1
+------ DCep
+-------- Cep_1
+-------- Cep_2
+-------- Cep_F
+---- T2Cep
+------ T2Cep_BLHer
+------ T2Cep_RVTau
+------ T2Cep_WVir
+---- LPV 
+------ LPV_Mira
+------ LPV_OSARG
+------ LPV_SRV
+---- DSCT
+------ DSCT_F1
+------ DSCT_S
+-- eclipsing 
+---- DPV
+ 

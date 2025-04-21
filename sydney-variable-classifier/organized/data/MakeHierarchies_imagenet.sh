@@ -1,0 +1,2 @@
+python3 ../Hierarchy/encode_hierarchy.py --h_file Test_files/imagenet_hierarchy.txt --m_file Test_files/imagenet_meta.txt --out Test_files/imagenet.parent-child.txt --out_names Test_files/imagenet_class_names.txt
+python3 ../compute_class_embedding.py --hierarchy Test_files/imagenet.parent-child.txt --out Test_files/imagenet.unitsphere.pickle --metric 2 
