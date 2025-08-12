@@ -66,9 +66,9 @@ def test_hierarchy():
     print(f"Expected classification nodes: {len(expected_key_nodes)}")
     missing_nodes = [node for node in expected_key_nodes if node not in hierarchy.nodes]
     if missing_nodes:
-        print(f"❌ Missing nodes: {missing_nodes}")
+        print(f"Missing nodes: {missing_nodes}")
     else:
-        print("✅ All 37 classification label nodes present")
+        print("All 37 classification label nodes present")
     
     # Test 2: Hierarchy Relationships
     print("\n2. HIERARCHY RELATIONSHIPS")
@@ -94,15 +94,15 @@ def test_hierarchy():
     relationship_errors = []
     for child, expected_parent in test_relationships:
         if child in hierarchy.parents and expected_parent in hierarchy.parents[child]:
-            print(f"✅ {child} -> {expected_parent}")
+            print(f"PASS: {child} -> {expected_parent}")
         else:
-            print(f"❌ {child} -> {expected_parent}")
+            print(f"FAIL: {child} -> {expected_parent}")
             relationship_errors.append((child, expected_parent))
     
     if relationship_errors:
-        print(f"❌ {len(relationship_errors)} relationship errors found")
+        print(f"FAIL: {len(relationship_errors)} relationship errors found")
     else:
-        print("✅ All key relationships validated")
+        print("All key relationships validated")
     
     # Test 3: Cycle Detection
     print("\n3. CYCLE DETECTION")
@@ -136,9 +136,9 @@ def test_hierarchy():
         return False
     
     if has_cycle(hierarchy):
-        print("❌ Cycle detected in hierarchy")
+        print("FAIL: Cycle detected in hierarchy")
     else:
-        print("✅ No cycles detected")
+        print("No cycles detected")
     
     # Test 4: Depth and Height Calculations
     print("\n4. DEPTH AND HEIGHT CALCULATIONS")
@@ -208,31 +208,31 @@ def test_hierarchy():
     # Test with non-existent nodes
     try:
         hierarchy.depth('non_existent_node')
-        print("❌ Should have failed for non-existent node in depth()")
+        print("FAIL: Should have failed for non-existent node in depth()")
     except KeyError:
-        print("✅ Correctly handles non-existent nodes in depth()")
+        print("Correctly handles non-existent nodes in depth()")
     
     # Test similarity methods with non-existent nodes
     try:
         hierarchy.wup_similarity('non_existent_node1', 'non_existent_node2')
-        print("❌ Should have failed for non-existent nodes in wup_similarity()")
+        print("FAIL: Should have failed for non-existent nodes in wup_similarity()")
     except KeyError:
-        print("✅ Correctly handles non-existent nodes in wup_similarity()")
+        print("Correctly handles non-existent nodes in wup_similarity()")
     
     try:
         hierarchy.metric2('galaxy', 'non_existent_node')
-        print("❌ Should have failed for non-existent node in metric2()")
+        print("FAIL: Should have failed for non-existent node in metric2()")
     except KeyError:
-        print("✅ Correctly handles non-existent nodes in metric2()")
+        print("Correctly handles non-existent nodes in metric2()")
     
     # Test self-similarity
     if 'galaxy' in hierarchy.nodes:
         self_sim = hierarchy.wup_similarity('galaxy', 'galaxy')
         print(f"  Self-similarity (galaxy, galaxy) = {self_sim:.3f}")
         if abs(self_sim - 1.0) < 1e-6:
-            print("✅ Self-similarity is 1.0")
+            print("Self-similarity is 1.0")
         else:
-            print("❌ Self-similarity should be 1.0")
+            print("FAIL: Self-similarity should be 1.0")
     
     # Test 9: Performance and Caching
     print("\n9. PERFORMANCE AND CACHING")
@@ -273,17 +273,17 @@ def test_hierarchy():
     
     try:
         hierarchy.save(temp_filename)
-        print(f"✅ Successfully saved hierarchy to {temp_filename}")
+        print(f"Successfully saved hierarchy to {temp_filename}")
         
         # Load from file
         loaded_hierarchy = GalaxyHierarchy.from_file(temp_filename)
-        print(f"✅ Successfully loaded hierarchy from file")
+        print(f"Successfully loaded hierarchy from file")
         
         # Compare original and loaded
         if len(hierarchy.nodes) == len(loaded_hierarchy.nodes):
-            print("✅ Node count matches")
+            print("Node count matches")
         else:
-            print(f"❌ Node count mismatch: {len(hierarchy.nodes)} vs {len(loaded_hierarchy.nodes)}")
+            print(f"FAIL: Node count mismatch: {len(hierarchy.nodes)} vs {len(loaded_hierarchy.nodes)}")
         
         # Test a few relationships
         sample_nodes = ['galaxy', 'initial_assessment', 'spiral_features']
@@ -297,9 +297,9 @@ def test_hierarchy():
                     break
         
         if relationships_match:
-            print("✅ Relationships preserved in loaded hierarchy")
+            print("Relationships preserved in loaded hierarchy")
         else:
-            print("❌ Relationships not preserved in loaded hierarchy")
+            print("FAIL: Relationships not preserved in loaded hierarchy")
     
     finally:
         # Clean up temporary file
@@ -313,16 +313,16 @@ def test_hierarchy():
     # Check if each node has at most one parent
     multi_parent_nodes = [node for node, parents in hierarchy.parents.items() if len(parents) > 1]
     if multi_parent_nodes:
-        print(f"❌ Nodes with multiple parents: {multi_parent_nodes[:5]}...")  # Show first 5
-        print(f"❌ Not a tree structure")
+        print(f"FAIL: Nodes with multiple parents: {multi_parent_nodes[:5]}...")  # Show first 5
+        print(f"FAIL: Not a tree structure")
     else:
-        print("✅ Each node has at most one parent (tree structure)")
+        print("Each node has at most one parent (tree structure)")
     
     # Check that root has no parents
     if not hierarchy.parents[hierarchy.root]:
-        print("✅ Root node has no parents")
+        print("Root node has no parents")
     else:
-        print(f"❌ Root node has parents: {hierarchy.parents[hierarchy.root]}")
+        print(f"FAIL: Root node has parents: {hierarchy.parents[hierarchy.root]}")
     
     # Test 12: Coverage Check
     print("\n12. COVERAGE CHECK")
@@ -344,9 +344,9 @@ def test_hierarchy():
     unreachable_nodes = hierarchy.nodes - reachable_nodes
     
     if unreachable_nodes:
-        print(f"❌ Unreachable nodes: {unreachable_nodes}")
+        print(f"FAIL: Unreachable nodes: {unreachable_nodes}")
     else:
-        print("✅ All nodes reachable from root")
+        print("All nodes reachable from root")
     
     print(f"  Reachable nodes: {len(reachable_nodes)}")
     print(f"  Total nodes: {len(hierarchy.nodes)}")
@@ -355,12 +355,12 @@ def test_hierarchy():
     print("\n" + "=" * 60)
     print("TEST SUMMARY")
     print("=" * 60)
-    print(f"✅ Structure validation: {len(missing_nodes) == 0}")
-    print(f"✅ Relationships: {len(relationship_errors) == 0}")
-    print(f"✅ No cycles: {not has_cycle(hierarchy)}")
-    print(f"✅ Tree structure: {len(multi_parent_nodes) == 0}")
-    print(f"✅ All nodes reachable: {len(unreachable_nodes) == 0}")
-    print(f"✅ Caching working: {second_run_time < first_run_time}")
+    print(f"Structure validation: {len(missing_nodes) == 0}")
+    print(f"Relationships: {len(relationship_errors) == 0}")
+    print(f"No cycles: {not has_cycle(hierarchy)}")
+    print(f"Tree structure: {len(multi_parent_nodes) == 0}")
+    print(f"All nodes reachable: {len(unreachable_nodes) == 0}")
+    print(f"Caching working: {second_run_time < first_run_time}")
     print(f"Total nodes: {len(hierarchy.nodes)}")
     print(f"Key nodes validated: {len(expected_key_nodes)}")
     
@@ -389,10 +389,10 @@ def print_classification_labels(hierarchy):
         node_name = hierarchy.label_to_node[label]
         if node_name in hierarchy.nodes:
             node_type = "leaf" if not hierarchy.children[node_name] else "intermediate"
-            exists = "✅"
+            exists = "PASS"
         else:
             node_type = "MISSING"
-            exists = "❌"
+            exists = "FAIL"
         print(f"{i:5d} | {label:55s} | {node_name:45s} | {node_type}")
     
     print("-" * 80)

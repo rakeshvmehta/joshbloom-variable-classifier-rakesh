@@ -293,7 +293,7 @@ def test_model_architecture():
     print(f"   ResNet model created: {type(factory_resnet).__name__}")
     
     print("\n" + "=" * 50)
-    print("✅ All architecture tests passed!")
+    print("All architecture tests passed!")
     print("\nKey features verified:")
     print("- Dual outputs: embeddings + classifications")
     print("- L2-normalized embeddings (norms ≈ 1.0)")

@@ -248,14 +248,14 @@ def test_hierarchical_loss():
             pred_embeddings, pred_classifications, true_labels
         )
         
-        print(f"\n✅ HierarchicalLoss test passed!")
+        print(f"\nHierarchicalLoss test passed!")
         print(f"  Total loss: {total_loss.item():.4f}")
         print(f"  Embedding loss: {emb_loss.item():.4f}")
         print(f"  Classification loss: {cls_loss.item():.4f}")
         print(f"  Loss ratio (emb:cls): {emb_loss.item():.3f}:{cls_loss.item():.3f}")
         
     except FileNotFoundError:
-        print("⚠️  Warning: Embedding file not found. Please run generate_galaxy_embeddings.py first")
+        print("Warning: Embedding file not found. Please run generate_galaxy_embeddings.py first")
         return False
     
     # Test adaptive loss
@@ -267,7 +267,7 @@ def test_hierarchical_loss():
             adaptation_epochs=10
         )
         
-        print(f"\n✅ AdaptiveHierarchicalLoss test:")
+        print(f"\nAdaptiveHierarchicalLoss test:")
         print(f"  Initial weight: {adaptive_loss.classification_weight:.3f}")
         
         # Simulate training epochs
@@ -276,10 +276,10 @@ def test_hierarchical_loss():
             print(f"  Epoch {epoch:2d}: weight = {adaptive_loss.classification_weight:.3f}")
             
     except FileNotFoundError:
-        print("⚠️  Warning: Could not test adaptive loss (embedding file missing)")
+        print("Warning: Could not test adaptive loss (embedding file missing)")
     
     print("\n" + "=" * 50)
-    print("✅ Loss function tests completed!")
+    print("Loss function tests completed!")
     
     return True
 

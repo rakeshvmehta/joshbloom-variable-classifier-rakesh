@@ -298,7 +298,7 @@ class HierarchicalTrainer:
         if is_best:
             best_path = self.save_dir / 'models' / 'best_hierarchical_model.pth'
             torch.save(checkpoint, best_path)
-            print(f"💾 New best model saved! (Val Loss: {self.best_val_loss:.4f})")
+            print(f"New best model saved! (Val Loss: {self.best_val_loss:.4f})")
     
     def plot_training_metrics(self):
         """Plot and save training metrics."""
@@ -397,7 +397,7 @@ class HierarchicalTrainer:
                 self.plot_training_metrics()
         
         print("\n" + "=" * 60)
-        print("🎉 Hierarchical training completed!")
+        print("Hierarchical training completed!")
         print(f"Best validation loss: {self.best_val_loss:.4f}")
         print(f"Best validation accuracy: {self.best_val_accuracy:.4f}")
         
@@ -447,7 +447,7 @@ def get_default_config():
 
 def main():
     """Main training function."""
-    print("🚀 Hierarchical Galaxy Classification Training")
+    print("Hierarchical Galaxy Classification Training")
     print("=" * 60)
     
     # Get configuration
