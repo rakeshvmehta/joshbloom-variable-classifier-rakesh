@@ -1,6 +1,0 @@
-animal
--- mammal
----- dog
------- milo
----- mouse
--- reptile

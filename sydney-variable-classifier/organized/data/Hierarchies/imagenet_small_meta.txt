@@ -1,3 +1,0 @@
-track,_running
-fly-fishing
-sand_tiger,_sand_shark,_Carcharias_taurus,_Odontaspis_taurus

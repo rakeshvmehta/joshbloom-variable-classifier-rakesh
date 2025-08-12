@@ -58,7 +58,11 @@ results/
 ehthumbs.db
 Thumbs.db
 
+# Data and large files
 training_images/
 downsized_galaxy_images/
 research_env/
 training_images.tar
+
+# Sydney Variable Classifier (external code)
+sydney-variable-classifier/
