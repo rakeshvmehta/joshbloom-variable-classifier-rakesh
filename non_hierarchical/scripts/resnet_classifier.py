@@ -3,7 +3,13 @@ import torch.nn as nn
 import torch.optim as optim
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from process_galaxy_dataset import get_data_loaders
+import sys
+from pathlib import Path
+
+# Add parent directory to path to import modules
+sys.path.append('..')
+from data_processing.process_galaxy_dataset import get_data_loaders
+from experiment_tracker import create_experiment_tracker
 from torchvision.models import resnet18
 
 class ResNetClassifier(nn.Module):
@@ -29,12 +35,13 @@ class ResNetClassifier(nn.Module):
     def forward(self, x):
         return self.resnet(x)
 
-def train_model(model, train_loader, val_loader, criterion, optimizer, num_epochs, device, save_path):
-    train_losses = []
-    val_losses = []
-    train_accuracies = []
-    val_accuracies = []
-    best_val_loss = float('inf')
+def train_model(model, train_loader, val_loader, criterion, optimizer, num_epochs, device, experiment_name=None, custom_config=None):
+    # Create experiment tracker
+    tracker = create_experiment_tracker(
+        experiment_name=experiment_name,
+        approach_type="non_hierarchical",
+        custom_config=custom_config
+    )
     
     # Learning rate scheduler
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, verbose=True)
@@ -80,8 +87,6 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, num_epoch
         
         avg_train_loss = train_loss / len(train_loader)
         train_accuracy = correct_predictions / total_samples if total_samples > 0 else 0
-        train_losses.append(avg_train_loss)
-        train_accuracies.append(train_accuracy)
         
         # Validation phase
         model.eval()
@@ -115,60 +120,24 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, num_epoch
         
         avg_val_loss = val_loss / len(val_loader)
         val_accuracy = val_correct / val_total if val_total > 0 else 0
-        val_losses.append(avg_val_loss)
-        val_accuracies.append(val_accuracy)
         
         # Update learning rate based on validation loss
         scheduler.step(avg_val_loss)
         
-        # Print epoch summary
-        print(f'\nEpoch {epoch+1} Summary:')
-        print(f'Training Loss: {avg_train_loss:.4f} | Training Accuracy (Top-1): {train_accuracy:.4f}')
-        print(f'Validation Loss: {avg_val_loss:.4f} | Validation Accuracy (Top-1): {val_accuracy:.4f}')
-        print(f'Learning Rate: {optimizer.param_groups[0]["lr"]:.6f}')
+        # Log metrics to experiment tracker
+        current_lr = optimizer.param_groups[0]["lr"]
+        tracker.log_epoch(epoch, avg_train_loss, avg_val_loss, train_accuracy, val_accuracy, current_lr)
         
-        # Save best model
-        if avg_val_loss < best_val_loss:
-            best_val_loss = avg_val_loss
-            torch.save({
-                'epoch': epoch,
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'train_losses': train_losses,
-                'val_losses': val_losses,
-                'train_accuracies': train_accuracies,
-                'val_accuracies': val_accuracies
-            }, save_path)
-            print(f'New best model saved! (Validation Loss: {best_val_loss:.4f}, Validation Accuracy (Top-1): {val_accuracy:.4f})')
-        else:
-            print(f'No improvement in validation loss')
+        # Save checkpoint
+        is_best = avg_val_loss < tracker.best_val_loss
+        tracker.save_checkpoint(model, optimizer, epoch, is_best)
         
         print('-' * 30)
     
-    return train_losses, val_losses, train_accuracies, val_accuracies
-
-def plot_metrics(train_losses, val_losses, train_accuracies, val_accuracies):
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+    # Finish experiment
+    tracker.finish_experiment()
     
-    # Plot losses
-    ax1.plot(train_losses, label='Training Loss')
-    ax1.plot(val_losses, label='Validation Loss')
-    ax1.set_xlabel('Epoch')
-    ax1.set_ylabel('Loss')
-    ax1.set_title('Training and Validation Losses')
-    ax1.legend()
-    
-    # Plot accuracies
-    ax2.plot(train_accuracies, label='Training Accuracy')
-    ax2.plot(val_accuracies, label='Validation Accuracy')
-    ax2.set_xlabel('Epoch')
-    ax2.set_ylabel('Accuracy')
-    ax2.set_title('Training and Validation Accuracies')
-    ax2.legend()
-    
-    plt.tight_layout()
-    plt.savefig('resnet_training_metrics.png')
-    plt.close()
+    return tracker
 
 def main():
     # Set device
@@ -185,6 +154,18 @@ def main():
     batch_size = 128
     learning_rate = 0.001  # Lower learning rate for ResNet
     num_epochs = 20
+    
+    # Custom configuration for experiment tracking
+    custom_config = {
+        'BATCH_SIZE': batch_size,
+        'LEARNING_RATE': learning_rate,
+        'NUM_EPOCHS': num_epochs,
+        'OPTIMIZER': 'adam',
+        'SCHEDULER': 'plateau',
+        'DROPOUT_RATE': 0.3,
+        'PRETRAINED': True
+    }
+    
     print(f'\nHyperparameters:')
     print(f'Batch size: {batch_size}')
     print(f'Learning rate: {learning_rate}')
@@ -193,9 +174,9 @@ def main():
     # Get data loaders
     print('\nLoading and preparing dataset...')
     data = get_data_loaders(
-        image_dir="training_images",
-        labels_file="training_classifications.csv",
-        downsized_dir="downsized_galaxy_images",
+        image_dir="../training_images",
+        labels_file="../training_classifications.csv",
+        downsized_dir="../downsized_galaxy_images",
         batch_size=batch_size,
         num_workers=4,
         train_ratio=0.8,
@@ -226,24 +207,16 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     print(f'Using MSE Loss and Adam optimizer')
    
-    # Save path for the model
-    save_path = 'best_resnet_model.pth'
-    print(f'\nModel checkpoints will be saved to: {save_path}')
-    
-    # Train the model
-    print('\nStarting training...')
+    # Train the model with experiment tracking
+    print('\nStarting training with experiment tracking...')
     print('=' * 50)
-    train_losses, val_losses, train_accuracies, val_accuracies = train_model(
+    tracker = train_model(
         model, train_loader, val_loader, criterion, optimizer,
-        num_epochs, device, save_path
+        num_epochs, device, experiment_name="resnet_baseline", custom_config=custom_config
     )
     print('=' * 50)
     print('Training completed!')
-    
-    # Plot metrics
-    print('\nGenerating training metrics plot...')
-    plot_metrics(train_losses, val_losses, train_accuracies, val_accuracies)
-    print('Training metrics plot saved as: resnet_training_metrics.png')
+    print(f'Results saved to: {tracker.experiment_dir}')
 
 if __name__ == '__main__':
     main()

@@ -83,11 +83,125 @@ python resnet_classifier.py
 python cnn_classifier.py
 ```
 
-## 🔧 Hyperparameter Tuning
+### **4. NEW: Unified Training (Recommended)**
+```bash
+# Train using global configuration
+python unified_trainer.py
 
-### **Primary Configuration: `hierarchy/config.py`**
+# The approach (hierarchical/non-hierarchical) is controlled by
+# the APPROACH setting in global_config.py
+```
 
-This is your **main playground** for hyperparameter tuning. All key parameters are defined here:
+## 🎯 **NEW: Unified Training System**
+
+The project now includes a **unified training system** that can handle both approaches:
+
+### **`unified_trainer.py` - One Script for All Approaches**
+- **Automatic approach selection** based on `global_config.py`
+- **Consistent experiment tracking** for both approaches
+- **Unified hyperparameter control** from one configuration file
+- **Cross-approach comparison** using the same metrics
+
+### **How to Use:**
+1. **Set your approach** in `global_config.py`:
+   ```python
+   APPROACH = 'hierarchical'  # or 'non_hierarchical'
+   MODEL_TYPE = 'resnet18'    # or 'cnn', 'resnet34', etc.
+   ```
+
+2. **Run unified training**:
+   ```bash
+   python unified_trainer.py
+   ```
+
+3. **Switch approaches** by editing `global_config.py` and running again
+
+4. **Compare results** across approaches:
+   ```bash
+   python unified_analyzer.py
+   ```
+
+## 📁 **Directory Structure & Purpose**
+
+### **Root Level (Main Control)**
+- **`global_config.py`** - **Master configuration** for ALL approaches
+- **`unified_trainer.py`** - **One training script** for both approaches
+- **`experiment_tracker.py`** - **Unified experiment tracking** system
+- **`unified_analyzer.py`** - **Cross-approach analysis** tool
+
+### **`hierarchy/` Directory**
+- **Purpose**: Contains hierarchical approach implementation
+- **Files**: Model architectures, loss functions, training scripts
+- **No config**: Uses main `global_config.py` instead
+- **No experiment tracking**: Handled by unified system
+
+### **`non_hierarchical/` Directory**
+- **Purpose**: Contains non-hierarchical approach implementations
+- **Files**: ResNet, CNN classifiers, baseline models
+- **No config**: Uses main `global_config.py` instead
+- **No experiment tracking**: Handled by unified system
+
+## 🔧 Global Configuration System
+
+### **Primary Configuration: `global_config.py`**
+
+This is your **ONLY configuration file** for all experiments. It replaces all individual config files and controls everything from one place:
+
+```python
+# ===== APPROACH SELECTION =====
+APPROACH = 'hierarchical'  # 'hierarchical' or 'non_hierarchical'
+MODEL_TYPE = 'resnet18'    # 'resnet18', 'resnet34', 'resnet50', 'cnn'
+
+# ===== DATA CONFIGURATION =====
+BATCH_SIZE = 64          # Try: 32, 64, 128
+NUM_WORKERS = 4          # Adjust based on your CPU cores
+
+# ===== TRAINING CONFIGURATION =====
+NUM_EPOCHS = 100         # Try: 50, 100, 200
+LEARNING_RATE = 0.001    # Try: 0.0001, 0.001, 0.01
+OPTIMIZER = 'adam'       # Try: 'adam', 'sgd'
+SCHEDULER = 'step'        # Try: 'step', 'cosine', 'plateau'
+
+# ===== HIERARCHICAL-SPECIFIC =====
+EMBEDDING_DIM = 128      # Try: 64, 128, 256
+CLASSIFICATION_WEIGHT = 0.1  # Try: 0.05, 0.1, 0.2
+
+# ===== NON-HIERARCHICAL-SPECIFIC =====
+DROPOUT_RATE = 0.3       # Try: 0.1, 0.3, 0.5
+PRETRAINED = True        # Use pretrained models
+```
+
+### **Workflow for Testing Hyperparameters:**
+
+1. **Edit `global_config.py`** - change the approach and values you want to test
+2. **Run unified experiment**: `python unified_trainer.py`
+3. **Check results**: Look in the new experiment folder
+4. **Analyze**: `python unified_analyzer.py` to compare across approaches
+5. **Repeat**: Edit `global_config.py` with new values and run again
+
+### **Example: Switching Between Approaches**
+```python
+# In global_config.py, change this line:
+APPROACH = 'hierarchical'  # Test hierarchical approach
+MODEL_TYPE = 'resnet18'
+LEARNING_RATE = 0.001
+
+# Run experiment
+python unified_trainer.py
+
+# Switch to non-hierarchical approach
+APPROACH = 'non_hierarchical'
+MODEL_TYPE = 'cnn'
+LEARNING_RATE = 0.0001
+
+# Run another experiment
+python unified_trainer.py
+
+# Compare results across approaches
+python unified_analyzer.py
+```
+
+## 🔧 Legacy Hyperparameter Tuning (Individual Approaches)
 
 ```python
 # ===== Data Configuration =====
@@ -137,11 +251,19 @@ python train_hierarchical.py
 python analyze_experiments.py
 ```
 
-## 📊 Experiment Tracking System
+## 📊 Unified Experiment Tracking System
+
+### **One System for All Approaches**
+The project now uses a **unified experiment tracking system** that works for both hierarchical and non-hierarchical approaches:
+
+- **`experiment_tracker.py`** - Core tracking system used by all approaches
+- **`unified_analyzer.py`** - Analyze and compare experiments across approaches
+- **Consistent organization** - Same structure for all experiments
+- **Cross-approach comparison** - See which approach works best
 
 ### **Automatic Organization**
 Each experiment automatically creates:
-- **Unique folder**: `experiments/exp_YYYYMMDD_HHMMSS/`
+- **Unique folder**: `{approach}/experiments/exp_YYYYMMDD_HHMMSS/`
 - **Configuration**: Exact settings used saved as JSON
 - **Metrics**: Training curves, losses, accuracies saved as JSON
 - **Models**: Checkpoints and best models saved
@@ -155,15 +277,28 @@ Each experiment automatically creates:
 - **Training time**: Per epoch timing and total training time
 
 ### **Experiment Comparison**
+
+#### **Individual Approach Analysis**
 ```bash
+# Analyze hierarchical experiments
 cd hierarchy
 python analyze_experiments.py
 
+# Analyze non-hierarchical experiments  
+cd non_hierarchical
+python analyze_experiments.py
+```
+
+#### **Unified Cross-Approach Analysis**
+```bash
+# Analyze ALL experiments across both approaches
+python unified_analyzer.py
+
 # Options:
-# 1. View experiments summary
-# 2. Plot hyperparameter comparison
-# 3. Find best experiment
-# 4. Analyze specific experiment
+# 1. View unified experiments summary
+# 2. Plot approach comparison
+# 3. Find best experiments across all approaches
+# 4. Analyze specific experiment (searches both approaches)
 ```
 
 ## 🧪 Running Experiments
