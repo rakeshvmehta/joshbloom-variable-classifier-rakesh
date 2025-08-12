@@ -7,6 +7,7 @@ combining:
 - Hierarchical loss function (embedding + classification loss)
 - Galaxy dataset with proper preprocessing
 - Evaluation metrics for both embedding quality and classification accuracy
+- Experiment tracking and logging
 
 Based on Sydney's variable classifier training approach but adapted for galaxy morphology.
 """
@@ -23,6 +24,7 @@ from pathlib import Path
 import pickle
 import json
 from datetime import datetime
+import pandas as pd
 
 # Add parent directory to path to import galaxy modules
 sys.path.append('..')
@@ -31,15 +33,44 @@ from process_galaxy_dataset import get_data_loaders
 # Import our hierarchical modules
 from hierarchical_galaxy_cnn import create_hierarchical_model
 from hierarchical_loss import create_loss_function
-
+from config import config
 
 class HierarchicalTrainer:
     """Complete training pipeline for hierarchical galaxy classification."""
     
-    def __init__(self, config):
-        self.config = config
-        self.device = self._setup_device()
-        self.setup_paths()
+    def __init__(self, experiment_name=None, custom_config=None):
+        """
+        Initialize trainer with global config and optional custom overrides.
+        
+        Args:
+            experiment_name: Name for this experiment (auto-generated if None)
+            custom_config: Dict of config overrides for this experiment
+        """
+        # Start with global config
+        self.config = config.to_dict()
+        
+        # Apply custom overrides if provided
+        if custom_config:
+            self.config.update(custom_config)
+        
+        # Generate experiment name if not provided
+        if experiment_name is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self.experiment_name = f"{config.EXPERIMENT_NAME_PREFIX}_{timestamp}"
+        else:
+            self.experiment_name = experiment_name
+        
+        # Setup experiment directory
+        self.experiment_dir = Path('experiments') / self.experiment_name
+        self.experiment_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Create subdirectories
+        (self.experiment_dir / 'model_checkpoints').mkdir(exist_ok=True)
+        (self.experiment_dir / 'plots').mkdir(exist_ok=True)
+        (self.experiment_dir / 'logs').mkdir(exist_ok=True)
+        
+        # Setup device
+        self.device = config.get_device()
         
         # Training state
         self.current_epoch = 0
@@ -53,423 +84,442 @@ class HierarchicalTrainer:
         self.val_accuracies = []
         self.embedding_losses = []
         self.classification_losses = []
+        self.learning_rates = []
         
-    def _setup_device(self):
-        """Setup the appropriate device for training."""
-        if torch.backends.mps.is_available():
-            device = torch.device('mps')
-        elif torch.cuda.is_available():
-            device = torch.device('cuda')
-        else:
-            device = torch.device('cpu')
+        # Save config for this experiment
+        self._save_experiment_config()
         
-        print(f"Using device: {device}")
-        return device
+        print(f"Starting experiment: {self.experiment_name}")
+        print(f"Experiment directory: {self.experiment_dir}")
+        config.print_config()
+        
+    def _save_experiment_config(self):
+        """Save the experiment configuration."""
+        config_path = self.experiment_dir / 'config.json'
+        with open(config_path, 'w') as f:
+            json.dump(self.config, f, indent=2)
+        
+        # Also save to experiments summary
+        self._update_experiments_summary()
     
-    def setup_paths(self):
-        """Setup paths for saving models and results."""
-        self.save_dir = Path(self.config.get('save_dir', 'hierarchical_results'))
-        self.save_dir.mkdir(exist_ok=True)
+    def _update_experiments_summary(self):
+        """Update the master experiments summary CSV."""
+        summary_path = Path('experiments') / 'experiments_summary.csv'
         
-        # Create subdirectories
-        (self.save_dir / 'models').mkdir(exist_ok=True)
-        (self.save_dir / 'plots').mkdir(exist_ok=True)
-        (self.save_dir / 'logs').mkdir(exist_ok=True)
+        # Create summary if it doesn't exist
+        if not summary_path.exists():
+            summary_df = pd.DataFrame(columns=[
+                'experiment_name', 'timestamp', 'learning_rate', 'batch_size', 
+                'model_type', 'embedding_dim', 'classification_weight', 
+                'embedding_loss_type', 'num_epochs', 'best_val_accuracy', 
+                'best_val_loss', 'status', 'notes'
+            ])
+        else:
+            summary_df = pd.read_csv(summary_path)
         
+        # Add/update current experiment
+        experiment_data = {
+            'experiment_name': self.experiment_name,
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'learning_rate': self.config['LEARNING_RATE'],
+            'batch_size': self.config['BATCH_SIZE'],
+            'model_type': self.config['MODEL_TYPE'],
+            'embedding_dim': self.config['EMBEDDING_DIM'],
+            'classification_weight': self.config['CLASSIFICATION_WEIGHT'],
+            'embedding_loss_type': self.config['EMBEDDING_LOSS_TYPE'],
+            'num_epochs': self.config['NUM_EPOCHS'],
+            'best_val_accuracy': 0.0,
+            'best_val_loss': float('inf'),
+            'status': 'running',
+            'notes': ''
+        }
+        
+        # Remove existing entry if it exists
+        summary_df = summary_df[summary_df['experiment_name'] != self.experiment_name]
+        
+        # Add new entry
+        summary_df = pd.concat([summary_df, pd.DataFrame([experiment_data])], ignore_index=True)
+        summary_df.to_csv(summary_path, index=False)
+    
     def load_data(self):
         """Load and prepare the galaxy dataset."""
         print("Loading galaxy dataset...")
         
         # Use your existing data pipeline
         data = get_data_loaders(
-            image_dir=self.config.get('image_dir', '../training_images'),
-            labels_file=self.config.get('labels_file', '../training_classifications.csv'),
-            downsized_dir=self.config.get('downsized_dir', '../downsized_galaxy_images'),
-            batch_size=self.config.get('batch_size', 64),
-            num_workers=self.config.get('num_workers', 4),
-            train_ratio=self.config.get('train_ratio', 0.8),
-            cache_size=self.config.get('cache_size', 1000)
+            image_dir=self.config['IMAGE_DIR'],
+            labels_file=self.config['LABELS_FILE'],
+            downsized_dir=self.config['DOWNSIZED_DIR'],
+            batch_size=self.config['BATCH_SIZE'],
+            num_workers=self.config['NUM_WORKERS'],
+            train_ratio=self.config['TRAIN_RATIO'],
+            cache_size=self.config['CACHE_SIZE']
         )
         
         self.train_loader = data['train_loader']
         self.val_loader = data['val_loader']
         
+        # Set number of classes from dataset
+        self.config['NUM_CLASSES'] = len(data['class_names'])
+        
         print(f"Training samples: {len(self.train_loader.dataset)}")
         print(f"Validation samples: {len(self.val_loader.dataset)}")
+        print(f"Number of classes: {self.config['NUM_CLASSES']}")
         
     def create_model(self):
-        """Create the hierarchical model."""
+        """Create the hierarchical CNN model."""
         print("Creating hierarchical model...")
         
-        model_config = {
-            'num_classes': 37,
-            'embedding_dim': 37,
-            'dropout_rate': self.config.get('dropout_rate', 0.3)
-        }
+        self.model = create_hierarchical_model(
+            model_type=self.config['MODEL_TYPE'],
+            num_classes=self.config['NUM_CLASSES'],
+            embedding_dim=self.config['EMBEDDING_DIM']
+        ).to(self.device)
         
-        architecture = self.config.get('architecture', 'cnn')
-        if architecture == 'resnet':
-            model_config['backbone'] = self.config.get('resnet_backbone', 'resnet18')
-            model_config['pretrained'] = self.config.get('pretrained', True)
-        
-        self.model = create_hierarchical_model(architecture, **model_config)
-        self.model = self.model.to(self.device)
-        
-        # Print model info
+        # Print model summary
         total_params = sum(p.numel() for p in self.model.parameters())
-        print(f"Model: {type(self.model).__name__}")
+        trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         print(f"Total parameters: {total_params:,}")
+        print(f"Trainable parameters: {trainable_params:,}")
         
     def create_loss_function(self):
         """Create the hierarchical loss function."""
-        print("Setting up hierarchical loss function...")
+        print("Creating hierarchical loss function...")
         
-        loss_config = {
-            'classification_weight': self.config.get('classification_weight', 0.1),
-            'loss_type': self.config.get('loss_type', 'inv_corr'),
-            'device': self.device
-        }
-        
-        embedding_path = self.config.get('embedding_path', 'galaxy_hierarchy_embeddings.unitsphere.pickle')
-        
-        self.criterion = create_loss_function(embedding_path, loss_config)
-        self.criterion = self.criterion.to(self.device)
+        self.loss_function = create_loss_function(
+            embedding_path=self.config['EMBEDDING_PATH'],
+            classification_weight=self.config['CLASSIFICATION_WEIGHT'],
+            loss_type=self.config['EMBEDDING_LOSS_TYPE'],
+            device=self.device
+        )
         
     def create_optimizer(self):
         """Create optimizer and learning rate scheduler."""
-        print("Setting up optimizer...")
+        print("Creating optimizer and scheduler...")
         
-        self.optimizer = optim.Adam(
-            self.model.parameters(),
-            lr=self.config.get('learning_rate', 0.001),
-            weight_decay=self.config.get('weight_decay', 1e-5)
-        )
+        # Create optimizer
+        if self.config['OPTIMIZER'].lower() == 'adam':
+            self.optimizer = optim.Adam(
+                self.model.parameters(),
+                lr=self.config['LEARNING_RATE'],
+                weight_decay=self.config['WEIGHT_DECAY']
+            )
+        elif self.config['OPTIMIZER'].lower() == 'sgd':
+            self.optimizer = optim.SGD(
+                self.model.parameters(),
+                lr=self.config['LEARNING_RATE'],
+                weight_decay=self.config['WEIGHT_DECAY'],
+                momentum=0.9
+            )
+        else:
+            raise ValueError(f"Unknown optimizer: {self.config['OPTIMIZER']}")
         
-        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer,
-            mode='min',
-            factor=self.config.get('lr_factor', 0.5),
-            patience=self.config.get('lr_patience', 5),
-            verbose=True
-        )
+        # Create scheduler
+        if self.config['SCHEDULER'] == 'step':
+            self.scheduler = optim.lr_scheduler.StepLR(
+                self.optimizer,
+                step_size=self.config['SCHEDULER_STEP_SIZE'],
+                gamma=self.config['SCHEDULER_GAMMA']
+            )
+        elif self.config['SCHEDULER'] == 'cosine':
+            self.scheduler = optim.lr_scheduler.CosineAnnealingLR(
+                self.optimizer,
+                T_max=self.config['NUM_EPOCHS']
+            )
+        elif self.config['SCHEDULER'] == 'plateau':
+            self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+                self.optimizer,
+                mode='min',
+                factor=0.5,
+                patience=10,
+                verbose=True
+            )
+        else:
+            self.scheduler = None
+            
+        print(f"Optimizer: {self.config['OPTIMIZER']}")
+        print(f"Scheduler: {self.config['SCHEDULER']}")
         
-    def convert_labels_to_indices(self, one_hot_labels):
-        """Convert one-hot encoded labels to class indices."""
-        return torch.argmax(one_hot_labels, dim=1)
-    
-    def compute_accuracy(self, predictions, targets):
-        """Compute classification accuracy."""
-        predicted_classes = torch.argmax(predictions, dim=1)
-        correct = (predicted_classes == targets).float()
-        return correct.mean().item()
-    
-    def train_epoch(self):
+    def train_epoch(self, epoch):
         """Train for one epoch."""
         self.model.train()
-        
-        epoch_loss = 0.0
-        epoch_embedding_loss = 0.0
-        epoch_classification_loss = 0.0
-        epoch_accuracy = 0.0
+        total_loss = 0.0
+        total_accuracy = 0.0
+        total_embedding_loss = 0.0
+        total_classification_loss = 0.0
         num_batches = 0
         
-        pbar = tqdm(self.train_loader, desc=f'Epoch {self.current_epoch+1} [Train]')
+        progress_bar = tqdm(self.train_loader, desc=f"Epoch {epoch+1}/{self.config['NUM_EPOCHS']}")
         
-        for batch in pbar:
-            images = batch['image'].to(self.device)
-            one_hot_labels = batch['labels'].to(self.device)
+        for batch_idx, (images, labels) in enumerate(progress_bar):
+            images = images.to(self.device)
+            labels = labels.to(self.device)
             
-            # Convert one-hot to class indices for hierarchical loss
-            class_indices = self.convert_labels_to_indices(one_hot_labels)
+            # Forward pass
+            self.optimizer.zero_grad()
+            embeddings, classifications = self.model(images)
             
-            # Forward pass with dual outputs
-            pred_embeddings, pred_classifications = self.model(images)
-            
-            # Compute hierarchical loss
-            total_loss, embedding_loss, classification_loss = self.criterion(
-                pred_embeddings, pred_classifications, class_indices
-            )
+            # Compute loss
+            loss, loss_components = self.loss_function(embeddings, classifications, labels)
             
             # Backward pass
-            self.optimizer.zero_grad()
-            total_loss.backward()
-            
-            # Gradient clipping
-            if self.config.get('gradient_clip', 0) > 0:
-                torch.nn.utils.clip_grad_norm_(
-                    self.model.parameters(), 
-                    self.config['gradient_clip']
-                )
-            
+            loss.backward()
             self.optimizer.step()
             
             # Compute accuracy
-            accuracy = self.compute_accuracy(pred_classifications, class_indices)
+            _, predicted = torch.max(classifications, 1)
+            accuracy = (predicted == labels).float().mean().item()
             
             # Update metrics
-            epoch_loss += total_loss.item()
-            epoch_embedding_loss += embedding_loss.item()
-            epoch_classification_loss += classification_loss.item()
-            epoch_accuracy += accuracy
+            total_loss += loss.item()
+            total_accuracy += accuracy
+            total_embedding_loss += loss_components['embedding_loss'].item()
+            total_classification_loss += loss_components['classification_loss'].item()
             num_batches += 1
             
             # Update progress bar
-            pbar.set_postfix({
-                'Loss': f'{total_loss.item():.4f}',
-                'Emb': f'{embedding_loss.item():.4f}',
-                'Cls': f'{classification_loss.item():.4f}',
-                'Acc': f'{accuracy:.4f}'
-            })
-        
-        # Average metrics
-        return (epoch_loss / num_batches, epoch_embedding_loss / num_batches, 
-                epoch_classification_loss / num_batches, epoch_accuracy / num_batches)
-    
-    def validate_epoch(self):
-        """Validate for one epoch."""
-        self.model.eval()
-        
-        epoch_loss = 0.0
-        epoch_embedding_loss = 0.0
-        epoch_classification_loss = 0.0
-        epoch_accuracy = 0.0
-        num_batches = 0
-        
-        pbar = tqdm(self.val_loader, desc=f'Epoch {self.current_epoch+1} [Val]')
-        
-        with torch.no_grad():
-            for batch in pbar:
-                images = batch['image'].to(self.device)
-                one_hot_labels = batch['labels'].to(self.device)
-                
-                # Convert one-hot to class indices
-                class_indices = self.convert_labels_to_indices(one_hot_labels)
-                
-                # Forward pass
-                pred_embeddings, pred_classifications = self.model(images)
-                
-                # Compute loss
-                total_loss, embedding_loss, classification_loss = self.criterion(
-                    pred_embeddings, pred_classifications, class_indices
-                )
-                
-                # Compute accuracy
-                accuracy = self.compute_accuracy(pred_classifications, class_indices)
-                
-                # Update metrics
-                epoch_loss += total_loss.item()
-                epoch_embedding_loss += embedding_loss.item()
-                epoch_classification_loss += classification_loss.item()
-                epoch_accuracy += accuracy
-                num_batches += 1
-                
-                # Update progress bar
-                pbar.set_postfix({
-                    'Loss': f'{total_loss.item():.4f}',
-                    'Emb': f'{embedding_loss.item():.4f}',
-                    'Cls': f'{classification_loss.item():.4f}',
-                    'Acc': f'{accuracy:.4f}'
+            if batch_idx % self.config['LOG_FREQUENCY'] == 0:
+                progress_bar.set_postfix({
+                    'Loss': f"{loss.item():.4f}",
+                    'Acc': f"{accuracy:.4f}",
+                    'LR': f"{self.optimizer.param_groups[0]['lr']:.6f}"
                 })
         
-        # Average metrics
-        return (epoch_loss / num_batches, epoch_embedding_loss / num_batches,
-                epoch_classification_loss / num_batches, epoch_accuracy / num_batches)
-    
-    def save_checkpoint(self, is_best=False):
+        # Return average metrics
+        return {
+            'loss': total_loss / num_batches,
+            'accuracy': total_accuracy / num_batches,
+            'embedding_loss': total_embedding_loss / num_batches,
+            'classification_loss': total_classification_loss / num_batches
+        }
+        
+    def validate_epoch(self, epoch):
+        """Validate for one epoch."""
+        self.model.eval()
+        total_loss = 0.0
+        total_accuracy = 0.0
+        total_embedding_loss = 0.0
+        total_classification_loss = 0.0
+        num_batches = 0
+        
+        with torch.no_grad():
+            for images, labels in self.val_loader:
+                images = images.to(self.device)
+                labels = labels.to(self.device)
+                
+                # Forward pass
+                embeddings, classifications = self.model(images)
+                
+                # Compute loss
+                loss, loss_components = self.loss_function(embeddings, classifications, labels)
+                
+                # Compute accuracy
+                _, predicted = torch.max(classifications, 1)
+                accuracy = (predicted == labels).float().mean().item()
+                
+                # Update metrics
+                total_loss += loss.item()
+                total_accuracy += accuracy
+                total_embedding_loss += loss_components['embedding_loss'].item()
+                total_classification_loss += loss_components['classification_loss'].item()
+                num_batches += 1
+        
+        # Return average metrics
+        return {
+            'loss': total_loss / num_batches,
+            'accuracy': total_accuracy / num_batches,
+            'embedding_loss': total_embedding_loss / num_batches,
+            'classification_loss': total_classification_loss / num_batches
+        }
+        
+    def save_checkpoint(self, epoch, is_best=False):
         """Save model checkpoint."""
         checkpoint = {
-            'epoch': self.current_epoch,
+            'epoch': epoch,
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
+            'scheduler_state_dict': self.scheduler.state_dict() if self.scheduler else None,
             'best_val_loss': self.best_val_loss,
             'best_val_accuracy': self.best_val_accuracy,
-            'config': self.config,
+            'config': self.config
+        }
+        
+        # Save checkpoint
+        checkpoint_path = self.experiment_dir / 'model_checkpoints' / f'checkpoint_epoch_{epoch}.pth'
+        torch.save(checkpoint, checkpoint_path)
+        
+        # Save best model if this is the best so far
+        if is_best:
+            best_model_path = self.experiment_dir / 'model_checkpoints' / 'best_model.pth'
+            torch.save(checkpoint, best_model_path)
+            print(f"New best model saved! Validation accuracy: {self.best_val_accuracy:.4f}")
+        
+        # Save last model if requested
+        if self.config['SAVE_LAST_MODEL']:
+            last_model_path = self.experiment_dir / 'model_checkpoints' / 'last_model.pth'
+            torch.save(checkpoint, last_model_path)
+            
+    def save_metrics(self):
+        """Save training metrics to JSON file."""
+        metrics = {
             'train_losses': self.train_losses,
             'val_losses': self.val_losses,
             'train_accuracies': self.train_accuracies,
-            'val_accuracies': self.val_accuracies
+            'val_accuracies': self.val_accuracies,
+            'embedding_losses': self.embedding_losses,
+            'classification_losses': self.classification_losses,
+            'learning_rates': self.learning_rates
         }
         
-        # Save latest checkpoint
-        checkpoint_path = self.save_dir / 'models' / 'latest_checkpoint.pth'
-        torch.save(checkpoint, checkpoint_path)
+        metrics_path = self.experiment_dir / 'metrics.json'
+        with open(metrics_path, 'w') as f:
+            json.dump(metrics, f, indent=2)
+            
+    def plot_training_curves(self):
+        """Plot and save training curves."""
+        fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+        fig.suptitle(f'Training Curves - {self.experiment_name}', fontsize=16)
         
-        # Save best checkpoint
-        if is_best:
-            best_path = self.save_dir / 'models' / 'best_hierarchical_model.pth'
-            torch.save(checkpoint, best_path)
-            print(f"New best model saved! (Val Loss: {self.best_val_loss:.4f})")
-    
-    def plot_training_metrics(self):
-        """Plot and save training metrics."""
-        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 10))
+        # Loss curves
+        axes[0, 0].plot(self.train_losses, label='Train Loss', color='blue')
+        axes[0, 0].plot(self.val_losses, label='Val Loss', color='red')
+        axes[0, 0].set_title('Total Loss')
+        axes[0, 0].set_xlabel('Epoch')
+        axes[0, 0].set_ylabel('Loss')
+        axes[0, 0].legend()
+        axes[0, 0].grid(True)
         
-        epochs = range(1, len(self.train_losses) + 1)
+        # Accuracy curves
+        axes[0, 1].plot(self.train_accuracies, label='Train Accuracy', color='blue')
+        axes[0, 1].plot(self.val_accuracies, label='Val Accuracy', color='red')
+        axes[0, 1].set_title('Accuracy')
+        axes[0, 1].set_xlabel('Epoch')
+        axes[0, 1].set_ylabel('Accuracy')
+        axes[0, 1].legend()
+        axes[0, 1].grid(True)
         
-        # Plot total losses
-        ax1.plot(epochs, self.train_losses, 'o-', label='Train Loss')
-        ax1.plot(epochs, self.val_losses, 's-', label='Val Loss')
-        ax1.set_xlabel('Epoch')
-        ax1.set_ylabel('Total Loss')
-        ax1.set_title('Training and Validation Losses')
-        ax1.legend()
-        ax1.grid(True)
+        # Component losses
+        axes[1, 0].plot(self.embedding_losses, label='Embedding Loss', color='green')
+        axes[1, 0].plot(self.classification_losses, label='Classification Loss', color='orange')
+        axes[1, 0].set_title('Component Losses')
+        axes[1, 0].set_xlabel('Epoch')
+        axes[1, 0].set_ylabel('Loss')
+        axes[1, 0].legend()
+        axes[1, 0].grid(True)
         
-        # Plot accuracies
-        ax2.plot(epochs, self.train_accuracies, 'o-', label='Train Accuracy')
-        ax2.plot(epochs, self.val_accuracies, 's-', label='Val Accuracy')
-        ax2.set_xlabel('Epoch')
-        ax2.set_ylabel('Accuracy')
-        ax2.set_title('Training and Validation Accuracies')
-        ax2.legend()
-        ax2.grid(True)
-        
-        # Plot embedding vs classification losses
-        if len(self.embedding_losses) > 0:
-            ax3.plot(epochs, self.embedding_losses, 'o-', label='Embedding Loss')
-            ax3.plot(epochs, self.classification_losses, 's-', label='Classification Loss')
-            ax3.set_xlabel('Epoch')
-            ax3.set_ylabel('Loss')
-            ax3.set_title('Embedding vs Classification Losses')
-            ax3.legend()
-            ax3.grid(True)
-        
-        # Plot loss ratio
-        if len(self.embedding_losses) > 0 and len(self.classification_losses) > 0:
-            loss_ratios = [e / (c + 1e-8) for e, c in zip(self.embedding_losses, self.classification_losses)]
-            ax4.plot(epochs, loss_ratios, 'o-', label='Embedding/Classification Ratio')
-            ax4.set_xlabel('Epoch')
-            ax4.set_ylabel('Loss Ratio')
-            ax4.set_title('Embedding to Classification Loss Ratio')
-            ax4.legend()
-            ax4.grid(True)
+        # Learning rate
+        axes[1, 1].plot(self.learning_rates, label='Learning Rate', color='purple')
+        axes[1, 1].set_title('Learning Rate Schedule')
+        axes[1, 1].set_xlabel('Epoch')
+        axes[1, 1].set_ylabel('Learning Rate')
+        axes[1, 1].legend()
+        axes[1, 1].grid(True)
         
         plt.tight_layout()
-        plt.savefig(self.save_dir / 'plots' / 'hierarchical_training_metrics.png', 
-                   dpi=300, bbox_inches='tight')
+        
+        # Save plot
+        plot_path = self.experiment_dir / 'plots' / 'training_curves.png'
+        plt.savefig(plot_path, dpi=300, bbox_inches='tight')
         plt.close()
-    
+        
+        print(f"Training curves saved to: {plot_path}")
+        
     def train(self):
         """Main training loop."""
-        print("Starting hierarchical training...")
-        print("=" * 60)
+        print("Starting training...")
         
-        num_epochs = self.config.get('num_epochs', 20)
+        # Setup
+        self.load_data()
+        self.create_model()
+        self.create_loss_function()
+        self.create_optimizer()
         
-        for epoch in range(num_epochs):
+        # Training loop
+        for epoch in range(self.config['NUM_EPOCHS']):
             self.current_epoch = epoch
             
-            # Training phase
-            train_loss, train_emb_loss, train_cls_loss, train_acc = self.train_epoch()
+            # Train
+            train_metrics = self.train_epoch(epoch)
             
-            # Validation phase  
-            val_loss, val_emb_loss, val_cls_loss, val_acc = self.validate_epoch()
+            # Validate
+            if epoch % self.config['VALIDATION_FREQUENCY'] == 0:
+                val_metrics = self.validate_epoch(epoch)
+                
+                # Update best metrics
+                if val_metrics['accuracy'] > self.best_val_accuracy:
+                    self.best_val_accuracy = val_metrics['accuracy']
+                    self.best_val_loss = val_metrics['loss']
+                
+                # Print epoch summary
+                print(f"Epoch {epoch+1}/{self.config['NUM_EPOCHS']}")
+                print(f"  Train - Loss: {train_metrics['loss']:.4f}, Acc: {train_metrics['accuracy']:.4f}")
+                print(f"  Val   - Loss: {val_metrics['loss']:.4f}, Acc: {val_metrics['accuracy']:.4f}")
+                print(f"  Best Val Acc: {self.best_val_accuracy:.4f}")
+                
+                # Store metrics
+                self.train_losses.append(train_metrics['loss'])
+                self.val_losses.append(val_metrics['loss'])
+                self.train_accuracies.append(train_metrics['accuracy'])
+                self.val_accuracies.append(val_metrics['accuracy'])
+                self.embedding_losses.append(train_metrics['embedding_loss'])
+                self.classification_losses.append(train_metrics['classification_loss'])
+                self.learning_rates.append(self.optimizer.param_groups[0]['lr'])
+                
+                # Save checkpoint
+                is_best = val_metrics['accuracy'] == self.best_val_accuracy
+                if epoch % self.config['CHECKPOINT_FREQUENCY'] == 0 or is_best:
+                    self.save_checkpoint(epoch, is_best)
+                
+                # Update plots
+                if epoch % self.config['PLOT_FREQUENCY'] == 0:
+                    self.plot_training_curves()
             
-            # Update learning rate
-            self.scheduler.step(val_loss)
-            
-            # Store metrics
-            self.train_losses.append(train_loss)
-            self.val_losses.append(val_loss)
-            self.train_accuracies.append(train_acc)
-            self.val_accuracies.append(val_acc)
-            self.embedding_losses.append(val_emb_loss)
-            self.classification_losses.append(val_cls_loss)
-            
-            # Check for best model
-            is_best = val_loss < self.best_val_loss
-            if is_best:
-                self.best_val_loss = val_loss
-                self.best_val_accuracy = val_acc
-            
-            # Save checkpoint
-            self.save_checkpoint(is_best)
-            
-            # Print epoch summary
-            print(f"\nEpoch {epoch+1}/{num_epochs} Summary:")
-            print(f"  Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f}")
-            print(f"  Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}")
-            print(f"  Embedding Loss: {val_emb_loss:.4f} | Classification Loss: {val_cls_loss:.4f}")
-            print(f"  LR: {self.optimizer.param_groups[0]['lr']:.6f}")
-            
-            # Plot metrics every 5 epochs
-            if (epoch + 1) % 5 == 0:
-                self.plot_training_metrics()
+            # Update scheduler
+            if self.scheduler:
+                if isinstance(self.scheduler, optim.lr_scheduler.ReduceLROnPlateau):
+                    self.scheduler.step(val_metrics['loss'])
+                else:
+                    self.scheduler.step()
         
-        print("\n" + "=" * 60)
-        print("Hierarchical training completed!")
-        print(f"Best validation loss: {self.best_val_loss:.4f}")
-        print(f"Best validation accuracy: {self.best_val_accuracy:.4f}")
+        # Final save
+        self.save_metrics()
+        self.plot_training_curves()
+        self.save_checkpoint(self.config['NUM_EPOCHS'] - 1, False)
         
-        # Final plots
-        self.plot_training_metrics()
+        # Update experiments summary
+        self._update_experiments_summary()
+        
+        print(f"Training completed! Best validation accuracy: {self.best_val_accuracy:.4f}")
+        print(f"Results saved to: {self.experiment_dir}")
 
-
-def get_default_config():
-    """Get default training configuration."""
-    return {
-        # Data settings
-        'image_dir': '../training_images',
-        'labels_file': '../training_classifications.csv', 
-        'downsized_dir': '../downsized_galaxy_images',
-        'embedding_path': 'galaxy_hierarchy_embeddings.unitsphere.pickle',
-        
-        # Model settings
-        'architecture': 'cnn',  # 'cnn' or 'resnet'
-        'resnet_backbone': 'resnet18',
-        'pretrained': True,
-        'dropout_rate': 0.3,
-        
-        # Training settings
-        'batch_size': 64,
-        'num_epochs': 20,
-        'learning_rate': 0.001,
-        'weight_decay': 1e-5,
-        'gradient_clip': 1.0,
-        
-        # Loss settings
-        'classification_weight': 0.1,
-        'loss_type': 'inv_corr',
-        
-        # Scheduler settings
-        'lr_factor': 0.5,
-        'lr_patience': 5,
-        
-        # Data loader settings
-        'num_workers': 4,
-        'train_ratio': 0.8,
-        'cache_size': 1000,
-        
-        # Save settings
-        'save_dir': 'hierarchical_results'
-    }
-
-
-def main():
-    """Main training function."""
-    print("Hierarchical Galaxy Classification Training")
-    print("=" * 60)
-    
-    # Get configuration
-    config = get_default_config()
-    
-    # Initialize trainer
-    trainer = HierarchicalTrainer(config)
-    
-    # Setup training components
-    trainer.load_data()
-    trainer.create_model()
-    trainer.create_loss_function()
-    trainer.create_optimizer()
-    
-    # Save configuration
-    config_path = trainer.save_dir / 'config.json'
-    with open(config_path, 'w') as f:
-        json.dump(config, f, indent=2)
-    
-    # Start training
+def run_experiment(experiment_name=None, custom_config=None):
+    """Run a single experiment with the given configuration."""
+    trainer = HierarchicalTrainer(experiment_name, custom_config)
     trainer.train()
-
+    return trainer
 
 if __name__ == "__main__":
-    main() 
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Run hierarchical galaxy classification training')
+    parser.add_argument('--name', type=str, help='Experiment name (auto-generated if not provided)')
+    parser.add_argument('--lr', type=float, help='Learning rate override')
+    parser.add_argument('--batch_size', type=int, help='Batch size override')
+    parser.add_argument('--cls_weight', type=float, help='Classification weight override')
+    parser.add_argument('--epochs', type=int, help='Number of epochs override')
+    
+    args = parser.parse_args()
+    
+    # Build custom config from command line args
+    custom_config = {}
+    if args.lr:
+        custom_config['LEARNING_RATE'] = args.lr
+    if args.batch_size:
+        custom_config['BATCH_SIZE'] = args.batch_size
+    if args.cls_weight:
+        custom_config['CLASSIFICATION_WEIGHT'] = args.cls_weight
+    if args.epochs:
+        custom_config['NUM_EPOCHS'] = args.epochs
+    
+    # Run experiment
+    trainer = run_experiment(args.name, custom_config if custom_config else None) 
