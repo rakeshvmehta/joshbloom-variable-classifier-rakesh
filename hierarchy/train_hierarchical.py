@@ -28,7 +28,7 @@ import pandas as pd
 
 # Add parent directory to path to import galaxy modules
 sys.path.append('..')
-from process_galaxy_dataset import get_data_loaders
+from data_processing.process_galaxy_dataset import get_data_loaders
 
 # Import our hierarchical modules
 from hierarchical_galaxy_cnn import create_hierarchical_model
