@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from skimage import io
 import time
 from tqdm import tqdm
-from downsize_images import downsize_image
+from .downsize_images import downsize_image
 
 class GalaxyDataset(Dataset):
     def __init__(self, image_dir, labels_file, transform=None, downsized_dir=None, cache_size=1000):
@@ -415,12 +415,16 @@ def get_data_loaders(image_dir="training_images",
         persistent_workers=num_workers > 0
     )
     
+    # Get class names from the dataset
+    class_names = list(dataset.labels_df.columns[1:])  # Skip 'GalaxyID' column
+    
     return {
         'train_loader': train_loader,
         'val_loader': val_loader,
         'train_dataset': train_dataset,
         'val_dataset': val_dataset,
-        'full_dataset': dataset
+        'full_dataset': dataset,
+        'class_names': class_names
     }
 
 if __name__ == "__main__":

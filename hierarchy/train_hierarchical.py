@@ -277,7 +277,7 @@ class HierarchicalTrainer:
     
     def train(self):
         """Main training loop."""
-        print("\n🔥 Starting training...")
+        print("\nStarting training...")
         print("=" * 60)
         
         # Load data
@@ -331,7 +331,7 @@ class HierarchicalTrainer:
                 else:
                     scheduler.step()
         
-        print("\n✅ Training completed!")
+        print("\nTraining completed!")
         print(f"Best validation accuracy: {self.best_val_accuracy:.4f}")
         
         return {
@@ -348,7 +348,7 @@ class HierarchicalTrainer:
 
 def main():
     """Main function to run hierarchical training."""
-    print("🎯 HIERARCHICAL GALAXY CLASSIFICATION TRAINER")
+    print("HIERARCHICAL GALAXY CLASSIFICATION TRAINER")
     print("=" * 60)
     
     # Create trainer

@@ -227,23 +227,34 @@ class HierarchicalResNetClassifier(nn.Module):
         return embeddings, classifications
 
 
-def create_hierarchical_model(architecture='cnn', **kwargs):
+def create_hierarchical_model(model_type='resnet18', num_classes=37, embedding_dim=128, **kwargs):
     """
     Factory function to create hierarchical models.
     
     Args:
-        architecture: 'cnn' or 'resnet'
+        model_type: 'resnet18', 'resnet34', 'resnet50', or 'cnn'
+        num_classes: Number of classification classes
+        embedding_dim: Dimension of semantic embeddings
         **kwargs: Additional arguments for the model
         
     Returns:
         Hierarchical model instance
     """
-    if architecture.lower() == 'cnn':
-        return HierarchicalCNNClassifier(**kwargs)
-    elif architecture.lower() == 'resnet':
-        return HierarchicalResNetClassifier(**kwargs)
+    if model_type.lower() == 'cnn':
+        return HierarchicalCNNClassifier(
+            num_classes=num_classes, 
+            embedding_dim=embedding_dim, 
+            **kwargs
+        )
+    elif model_type.lower() in ['resnet18', 'resnet34', 'resnet50']:
+        return HierarchicalResNetClassifier(
+            num_classes=num_classes,
+            embedding_dim=embedding_dim,
+            backbone=model_type.lower(),
+            **kwargs
+        )
     else:
-        raise ValueError(f"Unsupported architecture: {architecture}")
+        raise ValueError(f"Unsupported model_type: {model_type}")
 
 
 def test_model_architecture():

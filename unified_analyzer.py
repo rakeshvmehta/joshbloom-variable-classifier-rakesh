@@ -70,10 +70,10 @@ class UnifiedAnalyzer:
         df_sorted = self.all_experiments.sort_values('best_val_accuracy', ascending=False)
         
         for _, row in df_sorted.iterrows():
-            status_icon = "✅" if row['status'] == 'completed' else "🔄" if row['status'] == 'running' else "❌"
-            approach_icon = "🎯" if row['approach_type'] == 'hierarchical' else "📊"
+            status_text = "COMPLETED" if row['status'] == 'completed' else "RUNNING" if row['status'] == 'running' else "FAILED"
+            approach_text = "HIERARCHICAL" if row['approach_type'] == 'hierarchical' else "NON-HIERARCHICAL"
             
-            print(f"{status_icon} {approach_icon} {row['experiment_name']:<25} | "
+            print(f"[{status_text}] [{approach_text}] {row['experiment_name']:<25} | "
                   f"Type: {row['approach_type']:<15} | "
                   f"Model: {row['model_type']:<10} | "
                   f"LR: {row['learning_rate']:<8} | "
@@ -165,12 +165,12 @@ class UnifiedAnalyzer:
             return
         
         print("\n" + "=" * 80)
-        print("🏆 BEST EXPERIMENTS ACROSS ALL APPROACHES")
+        print("BEST EXPERIMENTS ACROSS ALL APPROACHES")
         print("=" * 80)
         
         # Overall best
         overall_best = completed_df.loc[completed_df['best_val_accuracy'].idxmax()]
-        print(f"🥇 OVERALL BEST: {overall_best['experiment_name']}")
+        print(f"OVERALL BEST: {overall_best['experiment_name']}")
         print(f"   Approach: {overall_best['approach_type']}")
         print(f"   Model: {overall_best['model_type']}")
         print(f"   Best Accuracy: {overall_best['best_val_accuracy']:.4f}")
@@ -179,7 +179,7 @@ class UnifiedAnalyzer:
         print(f"   Batch Size: {overall_best['batch_size']}")
         
         # Best by approach
-        print(f"\n🏆 BEST BY APPROACH:")
+        print(f"\nBEST BY APPROACH:")
         for approach in completed_df['approach_type'].unique():
             approach_data = completed_df[completed_df['approach_type'] == approach]
             best_in_approach = approach_data.loc[approach_data['best_val_accuracy'].idxmax()]
@@ -197,7 +197,7 @@ class UnifiedAnalyzer:
             exp_dir = Path(f'{approach}/experiments/{experiment_name}')
             if exp_dir.exists():
                 experiment_found = True
-                print(f"\n📊 DETAILED ANALYSIS: {experiment_name} ({approach})")
+                print(f"\nDETAILED ANALYSIS: {experiment_name} ({approach})")
                 print("=" * 60)
                 
                 # Load config
@@ -291,7 +291,7 @@ class UnifiedAnalyzer:
     
     def run_interactive_analysis(self):
         """Run interactive analysis session."""
-        print("🔬 UNIFIED EXPERIMENT ANALYSIS TOOL")
+        print("UNIFIED EXPERIMENT ANALYSIS TOOL")
         print("=" * 50)
         
         # Load all experiments

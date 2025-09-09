@@ -1,0 +1,17 @@
+{
+  "APPROACH_TYPE": "hierarchical",
+  "MODEL_TYPE": "resnet18",
+  "EMBEDDING_DIM": 37,
+  "NUM_EPOCHS": 10,
+  "LEARNING_RATE": 0.001,
+  "BATCH_SIZE": 64,
+  "OPTIMIZER": "adam",
+  "WEIGHT_DECAY": 0.0001,
+  "SCHEDULER": "step",
+  "SCHEDULER_STEP_SIZE": 30,
+  "SCHEDULER_GAMMA": 0.1,
+  "EMBEDDING_LOSS_TYPE": "inv_corr",
+  "CLASSIFICATION_WEIGHT": 0.1,
+  "EMBEDDING_WEIGHT": 1.0,
+  "EMBEDDING_PATH": "hierarchy/galaxy_hierarchy_embeddings.unitsphere.pickle"
+}

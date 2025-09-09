@@ -20,9 +20,7 @@ from experiment_tracker import create_experiment_tracker
 from data_processing.process_galaxy_dataset import get_data_loaders
 
 # Import hierarchical modules
-sys.path.append('hierarchy')
-from hierarchical_galaxy_cnn import create_hierarchical_model
-from hierarchical_loss import create_loss_function
+from hierarchy import create_hierarchical_model, create_loss_function
 
 class CNNClassifier(nn.Module):
     """Basic CNN classifier for non-hierarchical approach."""
@@ -119,14 +117,18 @@ def create_model(num_classes, model_type):
         else:
             raise ValueError(f"Unsupported model type for non-hierarchical: {model_type}")
 
-def create_loss_function():
+def create_unified_loss_function():
     """Create loss function based on approach."""
     if config.APPROACH == 'hierarchical':
+        # Create loss_config dictionary for hierarchical loss
+        loss_config = {
+            'classification_weight': config.CLASSIFICATION_WEIGHT,
+            'loss_type': config.EMBEDDING_LOSS_TYPE,
+            'device': config.get_device()
+        }
         return create_loss_function(
             embedding_path=config.EMBEDDING_PATH,
-            classification_weight=config.CLASSIFICATION_WEIGHT,
-            loss_type=config.EMBEDDING_LOSS_TYPE,
-            device=config.get_device()
+            loss_config=loss_config
         )
     else:
         # For non-hierarchical, use standard loss
@@ -195,7 +197,9 @@ def train_epoch(model, train_loader, criterion, optimizer, device, epoch):
         
         if config.APPROACH == 'hierarchical':
             embeddings, classifications = model(images)
-            loss, loss_components = criterion(embeddings, classifications, labels)
+            # Convert one-hot labels to class indices for hierarchical loss
+            class_indices = torch.argmax(labels, dim=1)
+            loss, embedding_loss, classification_loss = criterion(embeddings, classifications, class_indices)
         else:
             outputs = model(images)
             loss = criterion(outputs, labels)
@@ -213,6 +217,7 @@ def train_epoch(model, train_loader, criterion, optimizer, device, epoch):
         if config.APPROACH == 'hierarchical':
             _, predicted = torch.max(classifications, 1)
             true_labels = torch.argmax(labels, 1)
+            accuracy = (predicted == true_labels).float().mean().item()
         else:
             if config.USE_SIGMOID:
                 predicted = (outputs > 0.5).float()
@@ -255,7 +260,9 @@ def validate_epoch(model, val_loader, criterion, device, epoch):
             # Forward pass
             if config.APPROACH == 'hierarchical':
                 embeddings, classifications = model(images)
-                loss, loss_components = criterion(embeddings, classifications, labels)
+                # Convert one-hot labels to class indices for hierarchical loss
+                class_indices = torch.argmax(labels, dim=1)
+                loss, embedding_loss, classification_loss = criterion(embeddings, classifications, class_indices)
             else:
                 outputs = model(images)
                 loss = criterion(outputs, labels)
@@ -264,6 +271,7 @@ def validate_epoch(model, val_loader, criterion, device, epoch):
             if config.APPROACH == 'hierarchical':
                 _, predicted = torch.max(classifications, 1)
                 true_labels = torch.argmax(labels, 1)
+                accuracy = (predicted == true_labels).float().mean().item()
             else:
                 if config.USE_SIGMOID:
                     predicted = (outputs > 0.5).float()
@@ -285,7 +293,7 @@ def validate_epoch(model, val_loader, criterion, device, epoch):
 
 def main():
     """Main training function."""
-    print("🚀 UNIFIED GALAXY CLASSIFICATION TRAINER")
+    print("UNIFIED GALAXY CLASSIFICATION TRAINER")
     print("=" * 60)
     
     # Print and validate configuration
@@ -299,7 +307,7 @@ def main():
     print(f"Using device: {device}")
     
     # Load data
-    print("\n📊 Loading dataset...")
+    print("\nLoading dataset...")
     data = get_data_loaders(
         image_dir=config.IMAGE_DIR,
         labels_file=config.LABELS_FILE,
@@ -321,7 +329,7 @@ def main():
     print(f"Number of classes: {num_classes}")
     
     # Create model
-    print(f"\n🏗️ Creating {config.APPROACH} model...")
+    print(f"\nCreating {config.APPROACH} model...")
     model = create_model(num_classes, config.MODEL_TYPE).to(device)
     
     # Print model summary
@@ -332,11 +340,11 @@ def main():
     print(f"Trainable parameters: {trainable_params:,}")
     
     # Create loss function
-    print(f"\n🎯 Creating loss function...")
-    criterion = create_loss_function()
+    print(f"\nCreating loss function...")
+    criterion = create_unified_loss_function()
     
     # Create optimizer
-    print(f"\n⚙️ Creating optimizer...")
+    print(f"\nCreating optimizer...")
     optimizer = create_optimizer(model)
     
     # Create scheduler
@@ -345,7 +353,7 @@ def main():
     print(f"Scheduler: {config.SCHEDULER}")
     
     # Create experiment tracker
-    print(f"\n📝 Setting up experiment tracking...")
+    print(f"\nSetting up experiment tracking...")
     tracker = create_experiment_tracker(
         experiment_name=f"{config.APPROACH}_{config.MODEL_TYPE}",
         approach_type=config.APPROACH,
@@ -353,7 +361,7 @@ def main():
     )
     
     # Training loop
-    print(f"\n🔥 Starting training...")
+    print(f"\nStarting training...")
     print("=" * 60)
     
     for epoch in range(config.NUM_EPOCHS):
@@ -386,7 +394,7 @@ def main():
                 scheduler.step()
     
     # Finish experiment
-    print("\n✅ Training completed!")
+    print("\nTraining completed!")
     tracker.finish_experiment()
     print(f"Results saved to: {tracker.experiment_dir}")
 

@@ -27,7 +27,7 @@ class GlobalConfig:
     
     # ===== HIERARCHICAL CONFIGURATION =====
     # Only used when APPROACH = 'hierarchical'
-    EMBEDDING_DIM = 128
+    EMBEDDING_DIM = 37  # Must match the precomputed embeddings dimension
     EMBEDDING_PATH = 'hierarchy/galaxy_hierarchy_embeddings.unitsphere.pickle'
     EMBEDDING_LOSS_TYPE = 'inv_corr'  # 'inv_corr', 'squared_distance'
     CLASSIFICATION_WEIGHT = 0.1
@@ -40,7 +40,7 @@ class GlobalConfig:
     USE_SIGMOID = True  # For multi-label classification
     
     # ===== TRAINING CONFIGURATION =====
-    NUM_EPOCHS = 100
+    NUM_EPOCHS = 10
     LEARNING_RATE = 0.001
     OPTIMIZER = 'adam'  # 'adam', 'sgd'
     WEIGHT_DECAY = 1e-4
@@ -209,7 +209,7 @@ class GlobalConfig:
                 print(f"  ❌ {error}")
             return False
         
-        print("✅ Configuration validation passed!")
+        print("Configuration validation passed!")
         return True
 
 # Create a global instance

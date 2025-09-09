@@ -1,0 +1,2 @@
+experiment_name,timestamp,approach_type,model_type,learning_rate,batch_size,num_epochs,best_val_accuracy,best_val_loss,status,notes
+hierarchical_resnet18,2025-09-08 17:50:23,hierarchical,resnet18,0.001,64,10,0.0,inf,running,

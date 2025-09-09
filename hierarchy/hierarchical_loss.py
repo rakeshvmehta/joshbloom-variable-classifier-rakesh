@@ -129,6 +129,10 @@ class HierarchicalLoss(nn.Module):
         Returns:
             Target embeddings [batch_size, embedding_dim]
         """
+        # Ensure class_indices is the correct data type for indexing
+        if class_indices.dtype != torch.long:
+            class_indices = class_indices.long()
+        
         # Ensure class_embeddings is on the same device as class_indices
         if self.class_embeddings.device != class_indices.device:
             self.class_embeddings = self.class_embeddings.to(class_indices.device)
